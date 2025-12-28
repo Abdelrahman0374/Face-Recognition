@@ -10,13 +10,6 @@ A real-time face recognition web application built with Streamlit, MTCNN, and Fa
 - **Add Person** - Register new faces with automatic face selection (highest confidence)
 - **Database Management** - View, manage, and remove registered faces
 
-### UI & Performance
-- **Button-style interface** - Consistent, modern UI across all modes
-- **Automatic face selection** - No manual selection needed for registration
-- **Centered displays** - Professional layout with centered video/camera feeds
-- **Memory optimized** - Automatic image resizing for large uploads
-- **Color-coded detection** - Green for known persons, red for unknown
-
 ## Quick Start
 
 ### Install Dependencies
@@ -30,8 +23,6 @@ pip install -r requirements.txt
 ```bash
 streamlit run app.py
 ```
-
-The application will open in your browser at `http://localhost:8501`
 
 ## How to Use
 
@@ -112,7 +103,6 @@ app.py  ──────►  FaceEngine
 - **Web Framework**: Streamlit
 - **Computer Vision**: OpenCV
 - **Deep Learning**: TensorFlow/Keras
-- **Image Processing**: Pillow (PIL)
 
 ## Model Details
 
@@ -141,41 +131,6 @@ $$d(a, b) = \|a - b\|_2 = \sqrt{\sum_{i=1}^{512}(a_i - b_i)^2}$$
 **Recognition Decision:**
 - If $\text{distance} > \text{threshold}$ → Person is labeled as **"Unknown"**
 - If $\text{distance} \leq \text{threshold}$ → Person is **recognized**
-
-## Performance Optimizations
-
-- **Frame skipping** - Process every 3rd frame in video mode
-- **Batch processing** - Generate embeddings in batches
-- **Image resizing** - Auto-resize large images (max 1200px) to prevent memory errors
-- **Detection caching** - Reuse detection boxes for smooth video display
-
-## UI Features
-
-- **Dark theme** - Professional dark mode interface
-- **Responsive layout** - Adapts to different screen sizes
-- **Centered displays** - Video and camera feeds centered for better UX
-- **Button-style controls** - Consistent primary/secondary button states
-- **Real-time feedback** - Live confidence scores and detection counts
-
-## Color Scheme
-
-| Element | Color | Usage |
-|---------|-------|-------|
-| Known Person | Green (#00FF00) | Detection box & label |
-| Unknown Person | Red (#0000FF) | Detection box & label |
-| Primary Button | Blue (#2563eb) | Active selection |
-| Hover State | Blue (#3b82f6) | Button hover |
-
-## Requirements
-
-See `requirements.txt` for full dependency list. Key dependencies:
-- `streamlit>=1.28.0`
-- `tensorflow>=2.10.0`
-- `keras-facenet>=0.1.1`
-- `opencv-python>=4.8.0`
-- `mtcnn>=0.1.1`
-- `numpy>=1.23.5`
-- `pillow>=9.5.0`
 
 ## License
 
