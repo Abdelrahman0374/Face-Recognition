@@ -8,121 +8,113 @@ import cv2
 import numpy as np
 from PIL import Image
 import os
-import sys
 
-# Add current directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
+# Only import FaceEngine - Facade pattern
+from core.face_engine import FaceEngine
+from core.database_manager import DatabaseManager
 from models.facenet_model import FaceNetModel
 from models.face_detector import FaceDetector
-from core.database_manager import DatabaseManager
-from core.face_engine import FaceEngine
-import config
-
-# Page configuration
-st.set_page_config(
-    page_title=config.PAGE_TITLE,
-    page_icon=config.PAGE_ICON,
-    layout="wide",
-    initial_sidebar_state=config.SIDEBAR_STATE
+from config import (
+    MODEL_INPUT_SHAPE,
+    MIN_DETECTION_CONFIDENCE,
+    DETECTION_SCALE_FACTOR,
+    RECOGNITION_THRESHOLD,
+    PAGE_CONFIG
 )
 
-
+# Page configuration
+st.set_page_config(**PAGE_CONFIG)
 
 
 # Custom CSS - Simple Dark Theme
 st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* Base */
-.stApp { background: #121212; font-family: 'Inter', sans-serif; }
+    /* Base */
+    .stApp { background: #121212; font-family: 'Inter', sans-serif; }
 
-/* Header */
-.main-header {
-    font-size: 2.2rem;
-    font-weight: 700;
-    color: #ffffff;
-    text-align: center;
-    padding: 0.5rem 0;
-}
+    /* Header */
+    .main-header {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #ffffff;
+        text-align: center;
+        padding: 0.5rem 0;
+    }
 
-/* Sidebar */
-section[data-testid="stSidebar"] { background: #1a1a1a; border-right: 1px solid #333; }
+    /* Sidebar */
+    section[data-testid="stSidebar"] { background: #1a1a1a; border-right: 1px solid #333; }
 
-/* Buttons */
-.stButton > button {
-    background: #2563eb;
-    color: #fff !important;
-    border: none;
-    border-radius: 8px;
-    padding: 0.6rem 1.2rem;
-    font-weight: 600;
-    transition: all 0.2s ease;
-}
-.stButton > button:hover {
-    background: #3b82f6;
-    color: #fff !important;
-}
+    /* Buttons */
+    .stButton > button {
+        background: #2563eb;
+        color: #fff !important;
+        border: none;
+        border-radius: 8px;
+        padding: 0.6rem 1.2rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    .stButton > button:hover {
+        background: #3b82f6;
+        color: #fff !important;
+    }
 
-/* Messages */
-.stSuccess { background: #1e3a2f; border-left: 3px solid #22c55e; border-radius: 4px; }
-.stInfo { background: #1e2a3a; border-left: 3px solid #3b82f6; border-radius: 4px; }
-.stError { background: #3a1e1e; border-left: 3px solid #ef4444; border-radius: 4px; }
+    /* Messages */
+    .stSuccess { background: #1e3a2f; border-left: 3px solid #22c55e; border-radius: 4px; }
+    .stInfo { background: #1e2a3a; border-left: 3px solid #3b82f6; border-radius: 4px; }
+    .stError { background: #3a1e1e; border-left: 3px solid #ef4444; border-radius: 4px; }
 
-/* Headings */
-h2, h3 { color: #fff !important; font-weight: 600; }
+    /* Headings */
+    h2, h3 { color: #fff !important; font-weight: 600; }
 
-/* Tabs */
-.stTabs [aria-selected="true"] { background: #2563eb; color: #fff !important; }
+    /* Tabs */
+    .stTabs [aria-selected="true"] { background: #2563eb; color: #fff !important; }
 
-/* Slider */
-.stSlider * {
-    color: #ffffff !important;
-}
+    /* Slider */
+    .stSlider * {
+        color: #ffffff !important;
+    }
 
-/* Hide min & max labels */
-.stSlider [data-testid="stTickBarMin"],
-.stSlider [data-testid="stTickBarMax"] {
-    display: none !important;
-}
+    /* Hide min & max labels */
+    .stSlider [data-testid="stTickBarMin"],
+    .stSlider [data-testid="stTickBarMax"] {
+        display: none !important;
+    }
 
-/* Text Input */
-.stTextInput > div > div > input { background: #1e1e1e; border-radius: 6px; color: #fff; }
-.stTextInput > div > div > input:focus { border-color: #2563eb; }
+    /* Text Input */
+    .stTextInput > div > div > input { background: #1e1e1e; border-radius: 6px; color: #fff; }
+    .stTextInput > div > div > input:focus { border-color: #2563eb; }
 
-/* Radio */
-.stRadio > div > label { color: #ccc !important; }
-</style>
-""", unsafe_allow_html=True)
+    /* Radio */
+    .stRadio > div > label { color: #ccc !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 @st.cache_resource
 def load_engine():
     """Load and initialize FaceEngine (cached)"""
     with st.spinner("Loading FaceNet model..."):
-        facenet = FaceNetModel()
+        facenet_model = FaceNetModel()
 
     with st.spinner("Initializing face detector..."):
-        detector = FaceDetector(
-            min_confidence=config.DETECTION_CONFIDENCE,
-            scale_factor=config.DETECTION_SCALE
+        face_detector = FaceDetector(
+            min_confidence=MIN_DETECTION_CONFIDENCE,
+            scale_factor=DETECTION_SCALE_FACTOR
         )
 
     with st.spinner("Connecting to database..."):
-        db_path = os.path.join(os.path.dirname(__file__), 'database')
-        db_manager = DatabaseManager(db_path)
+        db_manager = DatabaseManager()
 
-    # Create FaceEngine as the main facade
-    engine = FaceEngine(
-        facenet_model=facenet,
-        face_detector=detector,
+    # Create and return FaceEngine facade
+    return FaceEngine(
+        facenet_model=facenet_model,
+        face_detector=face_detector,
         db_manager=db_manager,
-        threshold=config.RECOGNITION_THRESHOLD
+        threshold=RECOGNITION_THRESHOLD
     )
-
-    return engine
-
 
 def main():
     # Header
@@ -162,7 +154,7 @@ def main():
             "Recognition Threshold",
             min_value=0.3,
             max_value=1.0,
-            value=config.RECOGNITION_THRESHOLD,
+        value=RECOGNITION_THRESHOLD,
             step=0.05,
             help="Lower = more strict matching"
         )
@@ -189,7 +181,6 @@ def main():
 
     elif mode == "Database":
         database_mode(engine)
-
 
 def video_recognition_mode(engine):
     """Continuous video recognition mode with live webcam stream"""
@@ -260,7 +251,7 @@ def video_recognition_mode(engine):
                         color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
                         cv2.rectangle(display_frame, (x, y), (x + w, y + h), color, 2)
                         # Draw label
-                        label = f"{name} ({confidence:.0%})"
+                        label = f"{name}"
                         cv2.putText(display_frame, label, (x, y - 10),
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
@@ -273,7 +264,7 @@ def video_recognition_mode(engine):
                     # Update results text
                     if last_results:
                         result_text = f"**Detected {len(last_results)} face(s):** "
-                        result_text += ", ".join([f"{r['name']} ({r['confidence']:.0%})" for r in last_results])
+                        result_text += ", ".join([f"{r['name']}" for r in last_results])
                         results_placeholder.success(result_text)
                     else:
                         results_placeholder.info("No faces detected")
@@ -296,7 +287,6 @@ def video_recognition_mode(engine):
             </p>
         </div>
         """, unsafe_allow_html=True)
-
 
 def image_recognition_mode(engine):
     """Process images for recognition - upload or capture from webcam"""
@@ -370,11 +360,9 @@ def image_recognition_mode(engine):
             if results:
                 st.success(f"Found {len(results)} face(s)")
                 for result in results:
-                    status = "Known" if result['name'] != "Unknown" else "Unknown"
-                    st.write(f"**{result['name']}** ({status}) - Confidence: {result['confidence']:.2%}")
+                    st.write(f"**{result['name']}**")
             else:
                 st.warning("No faces detected in image")
-
 
 def add_person_mode(engine):
     """Add person to database via webcam or image upload"""
@@ -407,7 +395,7 @@ def add_person_mode(engine):
     face_image = None
     display_image = None
 
-
+    # Process Inputs
     if st.session_state.add_person_method == "Take a Photo":
         # Center the camera input
         cam_cols = st.columns([15, 70, 15])
@@ -431,8 +419,10 @@ def add_person_mode(engine):
             display_image = image
             face_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-    # Preview and add
-    if display_image is not None:
+
+    # Process and add person
+    if display_image is not None and person_name:
+        # Preview section
         col1, col2 = st.columns(2)
 
         with col1:
@@ -440,7 +430,7 @@ def add_person_mode(engine):
             st.image(display_image, use_container_width=True)
 
         with col2:
-            st.markdown("### Face Detection")
+            st.markdown("### Add to Database")
 
             # Resize image if too large to prevent memory errors
             max_dimension = 1200
@@ -454,54 +444,52 @@ def add_person_mode(engine):
             else:
                 face_image_resized = face_image
 
-            # Detect primary face using engine (highest confidence)
-            detection = engine.detect_face(face_image_resized)
+            # Add person button
+            if st.button("Add to Database", type="primary", use_container_width=True):
+                with st.spinner("Processing..."):
+                    # Call FaceEngine's comprehensive add_person method
+                    result = engine.add_person(person_name, face_image_resized)
 
-            if detection:
-                # Scale detection box back to original size if image was resized
-                if max(h, w) > max_dimension:
-                    scale = max(h, w) / max_dimension
-                    x, y, w_box, h_box = detection['box']
-                    detection['box'] = [
-                        int(x * scale),
-                        int(y * scale),
-                        int(w_box * scale),
-                        int(h_box * scale)
-                    ]
+                if result['success']:
+                    # Success - show detection box and success message
+                    if result['box']:
+                        # Scale box back to original size if image was resized
+                        box = result['box']
+                        if max(h, w) > max_dimension:
+                            scale_back = max(h, w) / max_dimension
+                            box = [int(coord * scale_back) for coord in box]
 
-                # Draw detection on preview
+                        # Draw detection box on original image
+                        preview = face_image.copy()
+                        x, y, w_box, h_box = box
+                        cv2.rectangle(preview, (x, y), (x + w_box, y + h_box), (0, 255, 0), 2)
+                        cv2.putText(preview, person_name, (x, y - 10),
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        preview_rgb = cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
+                        st.image(preview_rgb, caption="Detected Face", use_container_width=True)
 
-                preview = face_image.copy()
-                x, y, w, h = detection['box']
-                cv2.rectangle(preview, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                label = f"Confidence: {detection['confidence']:.2%}"
-                cv2.putText(preview, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                preview_rgb = cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
-                st.image(preview_rgb, use_container_width=True)
+                    st.success(result['reason'])
+                    st.balloons()
+                    st.rerun()
+                else:
+                    # Error - show appropriate message
+                    st.error(f"**Failed to Add Person**\n\n{result['reason']}")
 
-                st.success(f"Face detected (Confidence: {detection['confidence']:.2%})")
+                    # Show preview with box if available
+                    if result['box']:
+                        box = result['box']
+                        if max(h, w) > max_dimension:
+                            scale_back = max(h, w) / max_dimension
+                            box = [int(coord * scale_back) for coord in box]
 
-                # Add person button
-                if person_name and st.button("Add to Database", type="primary", use_container_width=True):
-                    # Extract the detected face using engine
-                    extracted_face = engine.extract_face(face_image, detection['box'])
+                        preview = face_image.copy()
+                        x, y, w_box, h_box = box
+                        cv2.rectangle(preview, (x, y), (x + w_box, y + h_box), (0, 0, 255), 2)
+                        preview_rgb = cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
+                        st.image(preview_rgb, caption="Detected Face", use_container_width=True)
 
-                    if extracted_face is None:
-                        st.error("Failed to extract face. Please try again.")
-                    else:
-                        # Add person using engine (handles embedding + database)
-                        if engine.add_person(person_name, extracted_face):
-                            st.success(f"Successfully added **{person_name}** to the database!")
-                            st.balloons()
-                            st.rerun()
-                        else:
-                            st.error("Failed to generate face embedding. Please try again with a clearer image.")
-
-                elif not person_name:
-                    st.info("Please enter a name above to add this person")
-            else:
-                st.error("No face detected in the image. Please try again with a clearer image.")
-
+    elif display_image is not None and not person_name:
+        st.info("Please enter a name above to add this person")
 
 def database_mode(engine):
     """View and manage database"""
@@ -570,7 +558,6 @@ def database_mode(engine):
 
     else:
         st.info("The database is empty. Go to 'Add Person' to register new faces.")
-
 
 if __name__ == "__main__":
     main()

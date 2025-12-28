@@ -33,63 +33,6 @@ class FaceEngine:
         self.detection_times = deque(maxlen=30)
         self.recognition_times = deque(maxlen=30)
 
-    # ==================== Face Detection ====================
-
-    def detect_faces(self, image):
-        """
-        Detect all faces in an image
-
-        Args:
-            image: BGR image from OpenCV
-
-        Returns:
-            List of detections with 'box', 'confidence', 'keypoints'
-        """
-        return self.detector.detect_faces(image)
-
-    def detect_face(self, image):
-        """
-        Detect the primary face in an image (highest confidence)
-
-        Args:
-            image: BGR image from OpenCV
-
-        Returns:
-            Single detection dict or None
-        """
-        return self.detector.detect_face(image)
-
-    def extract_face(self, image, box, margin=20):
-        """
-        Extract a single face from image
-
-        Args:
-            image: BGR image
-            box: [x, y, w, h] bounding box
-            margin: Pixels to add around face
-
-        Returns:
-            Extracted face (160x160x3) or None
-        """
-        return self.detector.extract_face(image, box, margin)
-
-    def draw_detections(self, frame, detections, names=None, confidences=None):
-        """
-        Draw detection boxes on frame
-
-        Args:
-            frame: Frame to draw on
-            detections: List of detections
-            names: Optional names for each detection
-            confidences: Optional confidence scores
-
-        Returns:
-            Annotated frame
-        """
-        return self.detector.draw_detections(frame, detections, names, confidences)
-
-    # ==================== Recognition ====================
-
     def process_frame(self, frame):
         """
         Process a single frame for face recognition
@@ -161,26 +104,6 @@ class FaceEngine:
 
         return annotated_frame, results
 
-    def get_embedding(self, face):
-        """
-        Get embedding for an extracted face
-
-        Args:
-            face: Extracted face image (160x160x3 BGR)
-
-        Returns:
-            512-D embedding vector or None
-        """
-        if face is None:
-            return None
-
-        embedding = self.facenet.get_embedding(face)
-
-        if np.any(np.isnan(embedding)) or np.all(embedding == 0):
-            return None
-
-        return embedding
-
     def _find_match(self, embedding, database=None):
         """
         Find closest match in database
@@ -212,25 +135,103 @@ class FaceEngine:
 
         return identity, min_distance
 
-    # ==================== Database Operations ====================
-
-    def add_person(self, name, face):
+    def add_person(self, name, image):
         """
-        Add a new person to the database
+        Add a person to the database with complete validation
+
+        Complete workflow:
+        1. Detect face in image (using detector)
+        2. Generate embedding (using facenet)
+        3. Validate duplicate name (using database)
+        4. Validate duplicate face (using database)
+        5. Add to database if all validations pass
 
         Args:
             name: Person's name
-            face: Extracted face image (160x160x3)
+            image: BGR image from OpenCV (can be any size)
 
         Returns:
-            True if successful, False otherwise
+            dict with keys:
+                - 'success': bool - True if person was added
+                - 'reason': str - Success message or error description
+                - 'box': List[int] - Face bounding box [x, y, w, h] (if face detected)
         """
-        embedding = self.get_embedding(face)
-        if embedding is None:
-            return False
+        # Step 1: Validate name is not empty
+        if not name or not name.strip():
+            return {
+                'success': False,
+                'reason': 'Name cannot be empty',
+                'box': None
+            }
 
-        self.db_manager.add_person(name, embedding, face)
-        return True
+        name = name.strip()
+
+        # Step 2: Detect face using detector
+        detection = self.detector.detect_face(image)
+
+        if not detection:
+            return {
+                'success': False,
+                'reason': 'No face detected in the image. Please try again with a clearer image.',
+                'box': None
+            }
+
+        box = detection['box']
+        confidence = detection['confidence']
+
+        # Step 3: Extract face from image
+        extracted_face = self.detector.extract_face(image, box)
+
+        if extracted_face is None:
+            return {
+                'success': False,
+                'reason': 'Failed to extract face from image',
+                'box': box
+            }
+
+        # Step 4: Generate embedding using facenet
+        embedding = self.facenet.get_embedding(extracted_face)
+
+        if embedding is None:
+            return {
+                'success': False,
+                'reason': 'Failed to generate face embedding. Please try again with a clearer image.',
+                'box': box
+            }
+
+        # Step 5: Validate - Check for duplicate name
+        if self.db_manager.check_name_exists(name):
+            return {
+                'success': False,
+                'reason': f'A person with the name "{name}" already exists in the database',
+                'box': box
+            }
+
+        # Step 6: Validate - Check for duplicate face
+        is_duplicate, matched_name, distance = self.db_manager.find_similar_face(embedding, self.threshold)
+
+        if is_duplicate:
+            return {
+                'success': False,
+                'reason': f'This face is already registered as "{matched_name}"',
+                'box': box
+            }
+
+        # Step 7: All validations passed - Add to database
+        success = self.db_manager.add_person(name, embedding, extracted_face)
+
+        if success:
+            return {
+                'success': True,
+                'reason': f'{name} has been successfully added to the database',
+                'box': box
+            }
+        else:
+            return {
+                'success': False,
+                'reason': 'Failed to save to database',
+                'box': box
+            }
 
     def remove_person(self, name):
         """
@@ -255,21 +256,3 @@ class FaceEngine:
     def get_stats(self):
         """Get database statistics"""
         return self.db_manager.get_stats()
-
-    # ==================== Metrics ====================
-
-    def get_fps(self):
-        """Calculate average FPS"""
-        if not self.frame_times:
-            return 0
-        avg_time = np.mean(self.frame_times)
-        return 1.0 / avg_time if avg_time > 0 else 0
-
-    def get_metrics(self):
-        """Get performance metrics"""
-        return {
-            'fps': self.get_fps(),
-            'avg_detection_time_ms': np.mean(self.detection_times) * 1000 if self.detection_times else 0,
-            'avg_recognition_time_ms': np.mean(self.recognition_times) * 1000 if self.recognition_times else 0,
-            'avg_total_time_ms': np.mean(self.frame_times) * 1000 if self.frame_times else 0
-        }

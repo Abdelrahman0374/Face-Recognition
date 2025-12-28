@@ -6,9 +6,10 @@ A real-time face recognition web application built with Streamlit, MTCNN, and Fa
 
 ### Core Functionality
 - **Video Recognition** - Continuous real-time face detection and recognition from webcam
-- **Image Recognition** - Upload an image or take an image for recognition
-- **Add Person** - Register new faces with automatic face selection (highest confidence)
+- **Image Recognition** - Upload an image or take a photo for recognition
+- **Add Person** - Register new faces with automatic face selection and duplicate detection
 - **Database Management** - View, manage, and remove registered faces
+- **Duplicate Detection** - Automatic validation prevents duplicate names and faces
 
 ## Quick Start
 
@@ -39,7 +40,7 @@ streamlit run app.py
 2. Choose your input method:
    - **Upload an Image** - Select an image file from your computer
    - **Take a Photo** - Capture with your camera
-3. View recognition results with confidence scores
+3. View recognition results with name-based identification
 
 ### Add a New Person
 1. Select **Add Person**
@@ -48,9 +49,10 @@ streamlit run app.py
    - **Upload an Image** - Select an image from your computer
    - **Take a Photo** - Capture with your camera
 4. The system automatically selects the primary face (highest confidence)
-5. Click **Add to Database**
+5. Validates that name and face aren't already registered
+6. Click **Add to Database**
 
-> **Best Practice**: Upload or capture an image that contains **only one person** for accurate registration. While the system can handle multiple faces and will automatically select the most prominent one (highest confidence), single-person images ensure the correct individual is registered.
+> **Best Practice**: Upload or capture an image that contains **only one person** for accurate registration.
 
 ### Manage Database
 1. Select **Database**

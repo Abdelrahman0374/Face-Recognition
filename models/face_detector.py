@@ -156,8 +156,8 @@ class FaceDetector:
             # Draw box
             cv2.rectangle(output, (x, y), (x + w, y + h), color, 2)
 
-            # Draw label
-            label = f"{name} ({conf:.2f})"
+            # Draw label - name only
+            label = f"{name}"
             (label_w, label_h), baseline = cv2.getTextSize(
                 label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
             )

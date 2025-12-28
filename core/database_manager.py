@@ -197,6 +197,58 @@ class DatabaseManager:
             'database_size_kb': total_size / 1024
         }
 
+    def check_name_exists(self, name):
+        """
+        Check if a person with this name already exists (case-insensitive)
+
+        Args:
+            name: Person's name to check
+
+        Returns:
+            bool: True if name exists, False otherwise
+        """
+        # Case-insensitive comparison
+        existing_names = [n.lower() for n in self.embeddings.keys()]
+        return name.lower() in existing_names
+
+    def find_similar_face(self, embedding, threshold=0.7):
+        """
+        Check if face embedding matches any existing person
+
+        Args:
+            embedding: Face embedding to check
+            threshold: Recognition threshold (lower = more strict)
+
+        Returns:
+            tuple: (is_duplicate, matched_name, distance)
+                - is_duplicate: True if similar face found
+                - matched_name: Name of matched person (or None)
+                - distance: Distance to matched person (or None)
+        """
+        if not self.embeddings:
+            # Empty database, no duplicates possible
+            return (False, None, None)
+
+        min_distance = float('inf')
+        closest_name = None
+
+        # Compare with all existing embeddings
+        for name, stored_embedding in self.embeddings.items():
+            # Calculate L2 distance
+            distance = np.linalg.norm(embedding - stored_embedding)
+
+            if distance < min_distance:
+                min_distance = distance
+                closest_name = name
+
+        # Check if closest match is within threshold
+        is_duplicate = min_distance < threshold
+
+        if is_duplicate:
+            return (True, closest_name, min_distance)
+        else:
+            return (False, None, None)
+
     def reload(self):
         """Reload database from disk"""
         self.embeddings = self._load_embeddings()
