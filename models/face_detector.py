@@ -70,6 +70,29 @@ class FaceDetector:
 
         return filtered
 
+    def detect_face(self, frame):
+        """
+        Detect the primary face in a frame (highest confidence)
+
+        This method is designed for scenarios where we expect a single person
+        to be the primary subject (e.g., registration, ID verification).
+
+        Args:
+            frame: BGR image from OpenCV
+
+        Returns:
+            Single detection dictionary with 'box', 'confidence', 'keypoints'
+            or None if no face is detected
+        """
+        detections = self.detect_faces(frame)
+
+        if not detections:
+            return None
+
+        # Return the face with highest confidence
+        primary_face = max(detections, key=lambda d: d['confidence'])
+        return primary_face
+
     def extract_face(self, frame, box, margin=20, target_size=(160, 160)):
         """
         Extract and align face from frame

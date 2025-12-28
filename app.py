@@ -1,6 +1,6 @@
 """
 Streamlit Face Recognition Application
-Real-time face detection and recognition with webcam support and photo upload
+Real-time face detection and recognition with webcam support and image upload
 """
 
 import streamlit as st
@@ -53,14 +53,17 @@ section[data-testid="stSidebar"] { background: #1a1a1a; border-right: 1px solid 
 /* Buttons */
 .stButton > button {
     background: #2563eb;
-    color: #fff;
+    color: #fff !important;
     border: none;
     border-radius: 8px;
     padding: 0.6rem 1.2rem;
     font-weight: 600;
     transition: all 0.2s ease;
 }
-.stButton > button:hover { background: #3b82f6; }
+.stButton > button:hover {
+    background: #3b82f6;
+    color: #fff !important;
+}
 
 /* Messages */
 .stSuccess { background: #1e3a2f; border-left: 3px solid #22c55e; border-radius: 4px; }
@@ -210,8 +213,12 @@ def video_recognition_mode(engine):
             st.rerun()
 
     if st.session_state.video_running:
-        # Placeholder for video frame
-        video_placeholder = st.empty()
+        # Placeholder for video frame - centered with equal spacing
+        col_vid = st.columns([15, 70, 15])  # 15% left, 70% video, 15% right
+
+        with col_vid[1]:  # Center column
+            video_placeholder = st.empty()
+
         results_placeholder = st.empty()
 
         # Open webcam with optimized settings
@@ -249,8 +256,8 @@ def video_recognition_mode(engine):
                     display_frame = frame.copy()
                     for box, name, confidence in last_detections:
                         x, y, w, h = box
-                        # Draw rectangle - theme colors (BGR format)
-                        color = (102, 174, 139) if name != "Unknown" else (171, 213, 235)  # #8BAE66 or #EBD5AB
+                        # Draw rectangle - Green for known, Red for unknown (BGR format)
+                        color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
                         cv2.rectangle(display_frame, (x, y), (x + w, y + h), color, 2)
                         # Draw label
                         label = f"{name} ({confidence:.0%})"
@@ -295,13 +302,27 @@ def image_recognition_mode(engine):
     """Process images for recognition - upload or capture from webcam"""
     st.subheader("Image Recognition")
 
-    # Tab selection for upload or capture
-    tab1, tab2 = st.tabs(["Upload Image", "Capture from Webcam"])
+    # Initialize session state for method selection
+    if 'img_recog_method' not in st.session_state:
+        st.session_state.img_recog_method = "Upload an Image"
+
+    # Button selection for upload or capture
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        if st.button("Upload an Image", type="primary" if st.session_state.img_recog_method == "Upload an Image" else "secondary", use_container_width=True):
+            st.session_state.img_recog_method = "Upload an Image"
+            st.rerun()
+    with btn_col2:
+        if st.button("Take a Photo", type="primary" if st.session_state.img_recog_method == "Take a Photo" else "secondary", use_container_width=True):
+            st.session_state.img_recog_method = "Take a Photo"
+            st.rerun()
+
+    st.divider()
 
     face_image = None
     display_image = None
 
-    with tab1:
+    if st.session_state.img_recog_method == "Upload an Image":
         uploaded_file = st.file_uploader(
             "Choose an image...",
             type=['jpg', 'jpeg', 'png', 'bmp'],
@@ -313,8 +334,12 @@ def image_recognition_mode(engine):
             display_image = image
             face_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-    with tab2:
-        camera_image = st.camera_input("Capture from webcam")
+
+    else:  # Take a Photo
+        # Center the camera input
+        cam_cols = st.columns([15, 70, 15])
+        with cam_cols[1]:
+            camera_image = st.camera_input("Take photo")
 
         if camera_image is not None:
             image = Image.open(camera_image)
@@ -352,39 +377,53 @@ def image_recognition_mode(engine):
 
 
 def add_person_mode(engine):
-    """Add person to database via webcam or photo upload"""
+    """Add person to database via webcam or image upload"""
     st.subheader("Add New Person")
 
     # Name input
     person_name = st.text_input(
         "Enter person's name",
-        placeholder="e.g., John Doe",
+        placeholder="e.g., Abdelrahman Sayed",
         help="This name will be used to identify the person"
     )
 
-    # Source selection
-    add_method = st.radio(
-        "Choose how to add the person",
-        ["Capture from Webcam", "Upload Photo"],
-        horizontal=True
-    )
+    # Initialize session state for method selection
+    if 'add_person_method' not in st.session_state:
+        st.session_state.add_person_method = "Upload an Image"
+
+    # Button selection for source
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        if st.button("Upload an Image", type="primary" if st.session_state.add_person_method == "Upload an Image" else "secondary", use_container_width=True, key="btn_upload"):
+            st.session_state.add_person_method = "Upload an Image"
+            st.rerun()
+    with btn_col2:
+        if st.button("Take a Photo", type="primary" if st.session_state.add_person_method == "Take a Photo" else "secondary", use_container_width=True, key="btn_webcam"):
+            st.session_state.add_person_method = "Take a Photo"
+            st.rerun()
+
+    st.divider()
 
     face_image = None
     display_image = None
 
-    if add_method == "Capture from Webcam":
-        camera_image = st.camera_input("Capture face")
+
+    if st.session_state.add_person_method == "Take a Photo":
+        # Center the camera input
+        cam_cols = st.columns([15, 70, 15])
+        with cam_cols[1]:
+            camera_image = st.camera_input("Take photo")
 
         if camera_image is not None:
             image = Image.open(camera_image)
             display_image = image
             face_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-    else:  # Upload Photo
+    else:  # Upload an Image
         uploaded_file = st.file_uploader(
-            "Upload a clear photo of the person's face",
+            "Upload a clear image of the person's face",
             type=['jpg', 'jpeg', 'png', 'bmp'],
-            help="The photo should clearly show the person's face"
+            help="The image should clearly show the person's face"
         )
 
         if uploaded_file is not None:
@@ -403,60 +442,49 @@ def add_person_mode(engine):
         with col2:
             st.markdown("### Face Detection")
 
-            # Detect faces using engine
-            detections = engine.detect_faces(face_image)
+            # Resize image if too large to prevent memory errors
+            max_dimension = 1200
+            h, w = face_image.shape[:2]
+            if max(h, w) > max_dimension:
+                scale = max_dimension / max(h, w)
+                new_w = int(w * scale)
+                new_h = int(h * scale)
+                face_image_resized = cv2.resize(face_image, (new_w, new_h))
+                st.caption(f"Image resized from {w}x{h} to {new_w}x{new_h} for processing")
+            else:
+                face_image_resized = face_image
 
-            if detections:
-                # Draw detection on preview with face numbers
+            # Detect primary face using engine (highest confidence)
+            detection = engine.detect_face(face_image_resized)
+
+            if detection:
+                # Scale detection box back to original size if image was resized
+                if max(h, w) > max_dimension:
+                    scale = max(h, w) / max_dimension
+                    x, y, w_box, h_box = detection['box']
+                    detection['box'] = [
+                        int(x * scale),
+                        int(y * scale),
+                        int(w_box * scale),
+                        int(h_box * scale)
+                    ]
+
+                # Draw detection on preview
+
                 preview = face_image.copy()
-                for idx, det in enumerate(detections):
-                    x, y, w, h = det['box']
-                    cv2.rectangle(preview, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                    # Add face number label
-                    label = f"Face {idx + 1}"
-                    cv2.putText(preview, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                x, y, w, h = detection['box']
+                cv2.rectangle(preview, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                label = f"Confidence: {detection['confidence']:.2%}"
+                cv2.putText(preview, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                 preview_rgb = cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
                 st.image(preview_rgb, use_container_width=True)
 
-                st.success(f"Detected {len(detections)} face(s)")
-
-                # Face selection for multiple faces
-                selected_face_idx = 0
-                if len(detections) > 1:
-                    st.info("Multiple faces detected. Please select the face you want to register.")
-
-                    # Show face thumbnails for selection
-                    st.markdown("#### Select a Face")
-                    face_cols = st.columns(min(len(detections), 4))
-
-                    # Extract face thumbnails using engine
-                    face_thumbnails = []
-                    for idx, det in enumerate(detections):
-                        extracted_face = engine.extract_face(face_image, det['box'])
-                        if extracted_face is not None:
-                            face_thumbnails.append((idx, extracted_face))
-
-                    # Display faces and create selection radio
-                    face_options = [f"Face {i+1}" for i in range(len(face_thumbnails))]
-
-                    for i, (idx, thumb) in enumerate(face_thumbnails):
-                        with face_cols[i % len(face_cols)]:
-                            thumb_rgb = cv2.cvtColor(thumb, cv2.COLOR_BGR2RGB)
-                            st.image(thumb_rgb, caption=f"Face {idx + 1}", use_container_width=True)
-
-                    selected_option = st.radio(
-                        "Choose face to register:",
-                        face_options,
-                        horizontal=True,
-                        key="face_selector"
-                    )
-                    selected_face_idx = face_options.index(selected_option)
+                st.success(f"Face detected (Confidence: {detection['confidence']:.2%})")
 
                 # Add person button
                 if person_name and st.button("Add to Database", type="primary", use_container_width=True):
-                    # Extract the selected face using engine
-                    selected_detection = detections[selected_face_idx]
-                    extracted_face = engine.extract_face(face_image, selected_detection['box'])
+                    # Extract the detected face using engine
+                    extracted_face = engine.extract_face(face_image, detection['box'])
 
                     if extracted_face is None:
                         st.error("Failed to extract face. Please try again.")
@@ -472,7 +500,7 @@ def add_person_mode(engine):
                 elif not person_name:
                     st.info("Please enter a name above to add this person")
             else:
-                st.error("No face detected in the image. Please try again with a clearer photo.")
+                st.error("No face detected in the image. Please try again with a clearer image.")
 
 
 def database_mode(engine):

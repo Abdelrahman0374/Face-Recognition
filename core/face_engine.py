@@ -47,6 +47,18 @@ class FaceEngine:
         """
         return self.detector.detect_faces(image)
 
+    def detect_face(self, image):
+        """
+        Detect the primary face in an image (highest confidence)
+
+        Args:
+            image: BGR image from OpenCV
+
+        Returns:
+            Single detection dict or None
+        """
+        return self.detector.detect_face(image)
+
     def extract_face(self, image, box, margin=20):
         """
         Extract a single face from image
