@@ -10,30 +10,19 @@ from mtcnn import MTCNN
 
 class FaceDetector:
     """
-    Face detection using MTCNN or Haar Cascade as fallback
+    Face detection using MTCNN
     """
-    def __init__(self, min_confidence=0.9, scale_factor=1.0, use_mtcnn=True):
+    def __init__(self, min_confidence=0.9, scale_factor=1.0):
         """
         Initialize face detector
 
         Args:
             min_confidence: Minimum detection confidence (0-1)
             scale_factor: Image scaling for faster detection (0.5 = half size)
-            use_mtcnn: Use MTCNN if available, otherwise Haar Cascade
         """
         self.min_confidence = min_confidence
         self.scale_factor = scale_factor
-        self.use_mtcnn = use_mtcnn
-
-        if self.use_mtcnn:
-            try:
-                self.detector = MTCNN(min_face_size=30)
-            except Exception:
-                self.use_mtcnn = False
-
-        if not self.use_mtcnn:
-            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-            self.detector = cv2.CascadeClassifier(cascade_path)
+        self.detector = MTCNN()
 
     def detect_faces(self, frame):
         """
@@ -45,13 +34,6 @@ class FaceDetector:
         Returns:
             List of dictionaries with 'box', 'confidence', 'keypoints'
         """
-        if self.use_mtcnn:
-            return self._detect_mtcnn(frame)
-        else:
-            return self._detect_haar(frame)
-
-    def _detect_mtcnn(self, frame):
-        """Detect faces using MTCNN"""
         # Convert BGR to RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -87,44 +69,6 @@ class FaceDetector:
                    if d['confidence'] >= self.min_confidence]
 
         return filtered
-
-    def _detect_haar(self, frame):
-        """Detect faces using Haar Cascade"""
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Resize for faster detection
-        if self.scale_factor != 1.0:
-            small_frame = cv2.resize(gray, None,
-                                    fx=self.scale_factor,
-                                    fy=self.scale_factor)
-        else:
-            small_frame = gray
-
-        # Detect faces
-        faces = self.detector.detectMultiScale(
-            small_frame,
-            scaleFactor=1.1,
-            minNeighbors=4,
-            minSize=(30, 30)
-        )
-
-        # Convert to standard format
-        detections = []
-        for (x, y, w, h) in faces:
-            # Scale back to original size
-            if self.scale_factor != 1.0:
-                x = int(x / self.scale_factor)
-                y = int(y / self.scale_factor)
-                w = int(w / self.scale_factor)
-                h = int(h / self.scale_factor)
-
-            detections.append({
-                'box': [x, y, w, h],
-                'confidence': 1.0,
-                'keypoints': {}
-            })
-
-        return detections
 
     def extract_face(self, frame, box, margin=20, target_size=(160, 160)):
         """
